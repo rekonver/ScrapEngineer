@@ -88,6 +88,7 @@ public class Damper : MonoBehaviour
         targetJoint.breakForce = configurableJoint.breakForce;
         targetJoint.breakTorque = configurableJoint.breakTorque;
 
+        Destroy(configurableJoint);
         return targetJoint;
     }
 
