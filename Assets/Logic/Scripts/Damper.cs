@@ -46,8 +46,8 @@ public class Damper : MonoBehaviour
 
     private void SetupConnections()
     {
-        StartConnection.dampers.Add(this);
-        EndConnection.dampers.Add(this);
+        StartConnection.Connections.Dampers.Add(this);
+        EndConnection.Connections.Dampers.Add(this);
     }
 
     private void CreateConfigurableJoint(GameObject parentGroup, GameObject endParentGroup)
@@ -219,8 +219,8 @@ public class Damper : MonoBehaviour
 
     public void DestroyDamper()
     {
-        if (StartConnection != null) StartConnection.dampers.Remove(this);
-        if (EndConnection != null) EndConnection.dampers.Remove(this);
+        if (StartConnection != null) StartConnection.Connections.Dampers.Remove(this);
+        if (EndConnection != null) EndConnection.Connections.Dampers.Remove(this);
 
         if (configurableJoint != null) Destroy(configurableJoint);
         if (EndConnection != null && EndConnection.gameObject != null) Destroy(EndConnection.gameObject);

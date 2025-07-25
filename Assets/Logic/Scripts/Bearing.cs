@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.UIElements.Experimental;
 
 public class Bearing : MonoBehaviour
 {
@@ -24,7 +25,7 @@ public class Bearing : MonoBehaviour
         GetComponent<Collider>().enabled = false;
     }
 
-    private void CallBlockToAddBearing(Block block) => block.AddBearing(this);
+    private void CallBlockToAddBearing(Block block) => block.Connections.Bearings.Add(this);
 
     private void CreateHingleJoint(GameObject parentGroup, Block endBlock = null)
     {
@@ -93,8 +94,11 @@ public class Bearing : MonoBehaviour
 
     public void DestroyBearing()
     {
-        if (StartConnection != null) StartConnection.bearings.Remove(this);
-        if (EndConnection != null) EndConnection.bearings.Remove(this);
+        if (StartConnection != null)
+            StartConnection.Connections.Bearings.Remove(this);
+
+        if (EndConnection != null)
+            EndConnection.Connections.Bearings.Remove(this);
 
         if (joint != null) Destroy(joint);
         Destroy(gameObject);

@@ -157,8 +157,8 @@ public class BlockConnector
     private void ConnectBlocks(Block parent, Block child)
     {
         child.parentConnection = parent.parentConnection;
-        parent.connectedObjects.Add(child.gameObject);
-        child.connectedObjects.Add(parent.gameObject);
+        parent.Connections.ConnectedObjects.Add(child.gameObject);
+        child.Connections.ConnectedObjects.Add(parent.gameObject);
     }
 
     private void ValidateParentConnection(Block block)

@@ -32,7 +32,6 @@ public class GridBlockSpawner : MonoBehaviour
 
         parentSystem.SuspendValidation = true;
         StartCoroutine(SpawnBlocksCoroutine());
-        enabled = false;
     }
 
     private IEnumerator SpawnBlocksCoroutine()
@@ -70,13 +69,16 @@ public class GridBlockSpawner : MonoBehaviour
             }
         }
 
-        StartCoroutine(CheckConnectionsParallel());
         Debug.Log($"[GridSpawner] Spawned {spawned} blocks");
-        rbParent.isKinematic = false;
+        StartCoroutine(CheckConnectionsParallel());
     }
 
     private IEnumerator CheckConnectionsParallel()
     {
+        // Спочатку чекаємо завершення всіх кадрів, щоб Unity обробив колайдери
+        yield return new WaitForFixedUpdate();
+        yield return new WaitForEndOfFrame();
+
         int blocksPerFrame = Mathf.Max(50, parentSystem.managedBlocks.Count / 50);
         int processed = 0;
 
@@ -91,5 +93,6 @@ public class GridBlockSpawner : MonoBehaviour
 
         parentSystem.SuspendValidation = false;
         parentSystem.QueueValidation();
+        rbParent.isKinematic = false;
     }
 }
