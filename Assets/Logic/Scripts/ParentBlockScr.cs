@@ -2,6 +2,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.Collections;
+using Unity.Jobs;
 
 public class ParentBlockScr : MonoBehaviour
 {
@@ -111,7 +113,7 @@ public class ParentBlockScr : MonoBehaviour
     {
         var removedId = removed.CachedGameObject.GetInstanceID();
         foreach (var b in managedBlocks)
-            b.connectedObjects.RemoveWhere(go => go != null && go.GetInstanceID() == removedId);
+            b.Connections.ConnectedObjects.RemoveWhere(go => go != null && go.GetInstanceID() == removedId);
     }
 
     public void QueueValidation()
@@ -138,7 +140,8 @@ public class ParentBlockScr : MonoBehaviour
             return;
         }
 
-        var subGroups = FindSubGroups();
+        //var subGroups = FindSubGroups();
+        var subGroups = FindSubGroupsWithJobs();
         if (subGroups.Count <= 1) return;
 
         StartCoroutine(SplitGroupsCoroutine(subGroups));
@@ -252,7 +255,7 @@ public class ParentBlockScr : MonoBehaviour
 
             oldBlock.transform.SetParent(newParent, true);
             oldBlock.parentConnection = newParent.gameObject;
-            oldBlock.connectedObjects.RemoveWhere(go => go == null);
+            oldBlock.Connections.ConnectedObjects.RemoveWhere(go => go == null);
             newGroupScr.managedBlocks.Add(oldBlock);
             blockMap.Add(oldBlock, oldBlock);
             CheckAdvancedBlock(oldBlock, newGroupScr);
@@ -265,9 +268,9 @@ public class ParentBlockScr : MonoBehaviour
         var newGroupObj = newGroupScr.gameObject;
         var newGroupRb = newGroupObj.GetComponent<Rigidbody>();
 
-        if (block.bearings.Count > 0)
+        if (block.Connections.Bearings.Count > 0)
         {
-            foreach (var b in block.bearings)
+            foreach (var b in block.Connections.Bearings)
             {
                 if (block == b.EndConnection)
                 {
@@ -280,9 +283,9 @@ public class ParentBlockScr : MonoBehaviour
                 }
             }
         }
-        if (block.dampers.Count > 0)
+        if (block.Connections.Dampers.Count > 0)
         {
-            foreach (var d in block.dampers)
+            foreach (var d in block.Connections.Dampers)
             {
                 if (block == d.EndConnection)
                 {
@@ -304,7 +307,72 @@ public class ParentBlockScr : MonoBehaviour
         public float drag;
         public float angularDrag;
     }
+    private List<HashSet<Block>> FindSubGroupsWithJobs()
+    {
+        var blocksList = managedBlocks.ToList();
+        int n = blocksList.Count;
+        if (n == 0) return new List<HashSet<Block>>();
 
+        // Створюємо NativeArrays без using блоку
+        var blockIDs = new NativeArray<int>(n, Allocator.TempJob);
+        var labels = new NativeArray<int>(n, Allocator.TempJob);
+        var connectionsMap = new NativeParallelMultiHashMap<int, int>(n * 5, Allocator.TempJob);
+
+        try
+        {
+            // Заповнення даних
+            for (int i = 0; i < n; i++)
+            {
+                Block block = blocksList[i];
+                blockIDs[i] = block.gameObject.GetInstanceID();
+                labels[i] = i; // Початкова мітка - індекс
+
+                foreach (var connObj in block.Connections.ConnectedObjects)
+                {
+                    if (connObj != null &&
+                        connObj.TryGetComponent(out Block neighbor))
+                    {
+                        connectionsMap.Add(block.gameObject.GetInstanceID(), neighbor.gameObject.GetInstanceID());
+                    }
+                }
+            }
+
+            // Створення та запуск Job
+            var job = new FindConnectionsJob
+            {
+                BlockInstanceIDs = blockIDs,
+                ConnectionsMap = connectionsMap,
+                ComponentLabels = labels
+            };
+
+            JobHandle handle = job.Schedule();
+            handle.Complete();
+
+            // Групування результатів
+            var groups = new Dictionary<int, HashSet<Block>>();
+            for (int i = 0; i < n; i++)
+            {
+                int label = labels[i];
+                if (!groups.TryGetValue(label, out var group))
+                {
+                    group = new HashSet<Block>();
+                    groups[label] = group;
+                }
+                group.Add(blocksList[i]);
+            }
+
+            return groups.Values.ToList();
+        }
+        finally
+        {
+            // Звільнення ресурсів у finally блоку
+            blockIDs.Dispose();
+            labels.Dispose();
+            connectionsMap.Dispose();
+        }
+    }
+
+    //OLD>>>-------------------------------------------------------------------------
     private List<HashSet<Block>> FindSubGroups() =>
         managedBlocks.Count < 100 ? FindSubGroupsSimple() : FindSubGroupsOptimized();
 
@@ -319,7 +387,7 @@ public class ParentBlockScr : MonoBehaviour
             var block = blocksList[i];
             if (block == null) continue;
 
-            var connectedObjects = new List<GameObject>(block.connectedObjects);
+            var connectedObjects = new List<GameObject>(block.Connections.ConnectedObjects);
             int connCount = connectedObjects.Count;
 
             for (int j = 0; j < connCount; j++)
@@ -356,7 +424,7 @@ public class ParentBlockScr : MonoBehaviour
                 visited.Add(current);
                 group.Add(current);
 
-                var connectedObjects = new List<GameObject>(current.connectedObjects);
+                var connectedObjects = new List<GameObject>(current.Connections.ConnectedObjects);
                 int count = connectedObjects.Count;
 
                 for (int i = 0; i < count; i++)
@@ -374,5 +442,30 @@ public class ParentBlockScr : MonoBehaviour
             groups.Add(group);
         }
         return groups;
+    }
+
+    //OLD<<<-------------------------------------------------------------------------
+    private void OnDrawGizmosSelected()
+    {
+        if (managedBlocks == null || managedBlocks.Count == 0)
+            return;
+
+        Gizmos.color = Color.yellow;
+        foreach (var block in managedBlocks)
+        {
+            if (block == null) continue;
+            Vector3 from = block.transform.position;
+            foreach (var go in block.Connections.ConnectedObjects)
+            {
+                if (go == null) continue;
+                if (go.TryGetComponent<Block>(out var neighbor) && managedBlocks.Contains(neighbor))
+                {
+                    Vector3 to = neighbor.transform.position;
+                    Gizmos.DrawLine(from, to);
+                    Gizmos.DrawSphere(from, 0.02f);
+                    Gizmos.DrawSphere(to, 0.02f);
+                }
+            }
+        }
     }
 }

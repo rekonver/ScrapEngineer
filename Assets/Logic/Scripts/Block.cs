@@ -2,18 +2,22 @@
 using System.Collections.Generic;
 using System.Linq;
 
+[System.Serializable]
+public class BlockConnections
+{
+    public List<Bearing> Bearings { get; } = new List<Bearing>();
+    public List<Damper> Dampers { get; } = new List<Damper>();
+    public HashSet<GameObject> ConnectedObjects { get; } = new HashSet<GameObject>();
+}
+
 public class Block : MonoBehaviour
 {
-    [Header("Bearing Connections")]
-    public List<Bearing> bearings = new List<Bearing>();
-
-    [Header("Damper Connections")]
-    public List<Damper> dampers = new List<Damper>();
+    [Header("Connections")]
+    public BlockConnections Connections = new BlockConnections();
 
     [Header("Connections")]
     public List<Transform> connectionPoints;
     public GameObject parentConnection;
-    public HashSet<GameObject> connectedObjects = new HashSet<GameObject>();
 
     [Header("Auto-Connect Settings")]
     public float checkRadius = 0.5f;
@@ -44,8 +48,6 @@ public class Block : MonoBehaviour
         CheckConnections();
     }
 
-    public void AddBearing(Bearing bearing) => bearings.Add(bearing);
-
     public void CheckConnections()
     {
         int pointCount = connectionPoints.Count;
@@ -72,8 +74,8 @@ public class Block : MonoBehaviour
                     otherBlock.parentConnection != parentConnection)
                     continue;
 
-                connectedObjects.Add(otherBlock.CachedGameObject);
-                otherBlock.connectedObjects.Add(CachedGameObject);
+                Connections.ConnectedObjects.Add(otherBlock.CachedGameObject);
+                otherBlock.Connections.ConnectedObjects.Add(CachedGameObject);
             }
         }
     }
@@ -82,13 +84,13 @@ public class Block : MonoBehaviour
     {
         if (!canBeDeleted) return;
 
-        foreach (var bearing in bearings.ToList())
+        foreach (var bearing in Connections.Bearings.ToList())
             bearing.DestroyBearing();
 
-        foreach (var damper in dampers.ToArray())
+        foreach (var damper in Connections.Dampers.ToArray())
             damper.DestroyDamper();
 
-        var connectedList = new List<GameObject>(connectedObjects);
+        var connectedList = new List<GameObject>(Connections.ConnectedObjects);
         int count = connectedList.Count;
 
         for (int i = 0; i < count; i++)
@@ -98,7 +100,7 @@ public class Block : MonoBehaviour
 
             if (obj.TryGetComponent(out Block b))
             {
-                b.connectedObjects.Remove(CachedGameObject);
+                b.Connections.ConnectedObjects.Remove(CachedGameObject);
                 if (b.parentConnection != null)
                     b.parentConnection.GetComponent<ParentBlockScr>()?.QueueValidation();
             }
@@ -108,7 +110,7 @@ public class Block : MonoBehaviour
         {
             parentConnection.GetComponent<ParentBlockScr>()?.UnregisterBlock(this);
             if (parentConnection.TryGetComponent(out Block parentBlock))
-                parentBlock.connectedObjects.Remove(CachedGameObject);
+                parentBlock.Connections.ConnectedObjects.Remove(CachedGameObject);
         }
 
         Destroy(CachedGameObject);
@@ -132,4 +134,31 @@ public class Block : MonoBehaviour
         }
         return closest;
     }
+
+    /*
+    private void OnDrawGizmos()
+    {
+        if (connectionPoints == null || connectionPoints.Count == 0)
+            return;
+
+        Gizmos.color = Color.yellow;
+
+        foreach (var point in connectionPoints)
+        {
+            if (point != null)
+                Gizmos.DrawWireSphere(point.position, checkRadius);
+        }
+
+        Gizmos.color = Color.green;
+
+        if (Connections != null && Connections.ConnectedObjects != null)
+        {
+            foreach (var obj in Connections.ConnectedObjects)
+            {
+                if (obj != null)
+                    Gizmos.DrawLine(transform.position, obj.transform.position);
+            }
+        }
+    }
+    */
 }
