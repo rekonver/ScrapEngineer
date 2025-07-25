@@ -5,9 +5,9 @@ using System.Linq;
 [System.Serializable]
 public class BlockConnections
 {
-    public List<Bearing> Bearings { get; } = new List<Bearing>();
-    public List<Damper> Dampers { get; } = new List<Damper>();
-    public HashSet<GameObject> ConnectedObjects { get; } = new HashSet<GameObject>();
+    public List<Bearing> Bearings = new List<Bearing>();
+    public List<Damper> Dampers = new List<Damper>();
+    public HashSet<GameObject> ConnectedObjects = new HashSet<GameObject>();
 }
 
 public class Block : MonoBehaviour
@@ -18,6 +18,7 @@ public class Block : MonoBehaviour
     [Header("Connections")]
     public List<Transform> connectionPoints;
     public GameObject parentConnection;
+    public Chunk chunk;
 
     [Header("Auto-Connect Settings")]
     public float checkRadius = 0.5f;
@@ -51,14 +52,11 @@ public class Block : MonoBehaviour
     public void CheckConnections()
     {
         int pointCount = connectionPoints.Count;
-        Vector3[] positions = new Vector3[pointCount];
-        for (int i = 0; i < pointCount; i++)
-            positions[i] = connectionPoints[i].position;
-
-        for (int p = 0; p < positions.Length; p++)
+        for (int p = 0; p < pointCount; p++)
         {
+            Vector3 point = connectionPoints[p].position;
             int count = Physics.OverlapSphereNonAlloc(
-                positions[p],
+                point,
                 checkRadius,
                 _overlapBuffer,
                 blockLayer,
@@ -113,6 +111,11 @@ public class Block : MonoBehaviour
                 parentBlock.Connections.ConnectedObjects.Remove(CachedGameObject);
         }
 
+        if (chunk != null)
+        {
+            chunk.RemoveBlock(this);
+        }
+
         Destroy(CachedGameObject);
     }
 
@@ -134,31 +137,4 @@ public class Block : MonoBehaviour
         }
         return closest;
     }
-
-    /*
-    private void OnDrawGizmos()
-    {
-        if (connectionPoints == null || connectionPoints.Count == 0)
-            return;
-
-        Gizmos.color = Color.yellow;
-
-        foreach (var point in connectionPoints)
-        {
-            if (point != null)
-                Gizmos.DrawWireSphere(point.position, checkRadius);
-        }
-
-        Gizmos.color = Color.green;
-
-        if (Connections != null && Connections.ConnectedObjects != null)
-        {
-            foreach (var obj in Connections.ConnectedObjects)
-            {
-                if (obj != null)
-                    Gizmos.DrawLine(transform.position, obj.transform.position);
-            }
-        }
-    }
-    */
 }

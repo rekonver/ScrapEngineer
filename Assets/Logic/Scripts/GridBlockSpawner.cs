@@ -46,12 +46,10 @@ public class GridBlockSpawner : MonoBehaviour
             {
                 for (int z = 0; z < sizeZ; z++)
                 {
-                    var blockObj = Instantiate(
-                        blockPrefab,
-                        parentObj.transform.position + new Vector3(x * spacing, y * spacing, z * spacing),
-                        Quaternion.identity,
-                        parentObj.transform
-                    );
+                    Vector3 position = parentObj.transform.position +
+                                      new Vector3(x * spacing, y * spacing, z * spacing);
+
+                    var blockObj = Instantiate(blockPrefab, position, Quaternion.identity);
 
                     if (blockObj.TryGetComponent<Rigidbody>(out var rb))
                         Destroy(rb);
@@ -60,6 +58,7 @@ public class GridBlockSpawner : MonoBehaviour
                     {
                         block.parentConnection = parentObj;
                         parentSystem.managedBlocks.Add(block);
+                        parentSystem.AddBlockToChunk(block);
                     }
 
                     spawned++;
@@ -69,13 +68,13 @@ public class GridBlockSpawner : MonoBehaviour
             }
         }
 
-        Debug.Log($"[GridSpawner] Spawned {spawned} blocks");
         StartCoroutine(CheckConnectionsParallel());
+        Debug.Log($"[GridSpawner] Spawned {spawned} blocks");
+        rbParent.isKinematic = false;
     }
 
     private IEnumerator CheckConnectionsParallel()
     {
-        // Спочатку чекаємо завершення всіх кадрів, щоб Unity обробив колайдери
         yield return new WaitForFixedUpdate();
         yield return new WaitForEndOfFrame();
 
@@ -93,6 +92,5 @@ public class GridBlockSpawner : MonoBehaviour
 
         parentSystem.SuspendValidation = false;
         parentSystem.QueueValidation();
-        rbParent.isKinematic = false;
     }
 }

@@ -2,25 +2,22 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using Unity.Collections;
-using Unity.Jobs;
 
 public class ParentBlockScr : MonoBehaviour
 {
     [Header("References")]
     public GroupSettings groupSettings;
     public HashSet<Block> managedBlocks = new HashSet<Block>();
+    public List<Chunk> chunks = new List<Chunk>();
     public bool SuspendValidation { get; set; } = false;
     private bool validationQueued = false;
 
     private Transform _cachedTransform;
-    private BlockGroup _cachedBlockGroup;
     private Rigidbody _cachedRigidbody;
 
     void Awake()
     {
         _cachedTransform = transform;
-        _cachedBlockGroup = GetComponent<BlockGroup>();
         _cachedRigidbody = GetComponent<Rigidbody>();
         _cachedRigidbody.isKinematic = false;
         RegisterChildBlocks();
@@ -28,67 +25,13 @@ public class ParentBlockScr : MonoBehaviour
 
     private void RegisterChildBlocks()
     {
-        var childBlocks = GetComponentsInChildren<Block>();
-        foreach (var block in childBlocks)
-            if (block.parentConnection == gameObject)
+        foreach (Transform child in _cachedTransform)
+        {
+            if (child.TryGetComponent(out Block block) && block.parentConnection == gameObject)
+            {
                 RegisterBlock(block);
-    }
-
-    private class DisjointSet
-    {
-        private Dictionary<Block, Block> parent = new Dictionary<Block, Block>();
-        private Dictionary<Block, int> rank = new Dictionary<Block, int>();
-        private Dictionary<Block, HashSet<Block>> sets = new Dictionary<Block, HashSet<Block>>();
-
-        public DisjointSet(IEnumerable<Block> blocks)
-        {
-            foreach (var block in blocks)
-            {
-                parent[block] = block;
-                rank[block] = 0;
-                sets[block] = new HashSet<Block> { block };
             }
         }
-
-        public Block Find(Block x)
-        {
-            Block root = x;
-            while (parent[root] != root)
-                root = parent[root];
-
-            Block current = x;
-            while (parent[current] != root)
-            {
-                Block next = parent[current];
-                parent[current] = root;
-                current = next;
-            }
-            return root;
-        }
-
-        public void Union(Block a, Block b)
-        {
-            var rootA = Find(a);
-            var rootB = Find(b);
-            if (rootA == rootB) return;
-
-            if (rank[rootA] < rank[rootB])
-            {
-                parent[rootA] = rootB;
-                sets[rootB].UnionWith(sets[rootA]);
-                sets.Remove(rootA);
-            }
-            else
-            {
-                parent[rootB] = rootA;
-                sets[rootA].UnionWith(sets[rootB]);
-                sets.Remove(rootB);
-                if (rank[rootA] == rank[rootB])
-                    rank[rootA]++;
-            }
-        }
-
-        public List<HashSet<Block>> GetSets() => sets.Values.ToList();
     }
 
     public void RegisterBlock(Block block)
@@ -96,6 +39,7 @@ public class ParentBlockScr : MonoBehaviour
         if (managedBlocks.Add(block))
         {
             block.parentConnection = gameObject;
+            AddBlockToChunk(block);
             QueueValidation();
         }
     }
@@ -104,6 +48,10 @@ public class ParentBlockScr : MonoBehaviour
     {
         if (managedBlocks.Remove(block))
         {
+            if (block.chunk != null)
+            {
+                block.chunk.RemoveBlock(block);
+            }
             CleanConnections(block);
             QueueValidation();
         }
@@ -113,7 +61,41 @@ public class ParentBlockScr : MonoBehaviour
     {
         var removedId = removed.CachedGameObject.GetInstanceID();
         foreach (var b in managedBlocks)
+        {
             b.Connections.ConnectedObjects.RemoveWhere(go => go != null && go.GetInstanceID() == removedId);
+        }
+    }
+
+    public void AddBlockToChunk(Block block)
+    {
+        // Try to add to existing chunk with space
+        foreach (var chunk in chunks)
+        {
+            if (!chunk.IsFull)
+            {
+                chunk.AddBlock(block);
+                return;
+            }
+        }
+
+        // Create new chunk if no space
+        CreateNewChunk().AddBlock(block);
+    }
+
+    private Chunk CreateNewChunk()
+    {
+        GameObject chunkObj = new GameObject($"Chunk_{chunks.Count}");
+        chunkObj.transform.SetParent(_cachedTransform);
+        Chunk chunk = chunkObj.AddComponent<Chunk>();
+        chunk.parentSystem = this;
+        chunks.Add(chunk);
+        return chunk;
+    }
+
+    public void RemoveChunk(Chunk chunk)
+    {
+        chunks.Remove(chunk);
+        Destroy(chunk.gameObject);
     }
 
     public void QueueValidation()
@@ -140,8 +122,14 @@ public class ParentBlockScr : MonoBehaviour
             return;
         }
 
-        //var subGroups = FindSubGroups();
-        var subGroups = FindSubGroupsWithJobs();
+        // First validate each chunk
+        foreach (var chunk in chunks.ToList())
+        {
+            chunk.CheckChunkIntegrity();
+        }
+
+        // Then validate global connections
+        var subGroups = FindSubGroups();
         if (subGroups.Count <= 1) return;
 
         StartCoroutine(SplitGroupsCoroutine(subGroups));
@@ -149,60 +137,52 @@ public class ParentBlockScr : MonoBehaviour
 
     private IEnumerator SplitGroupsCoroutine(List<HashSet<Block>> subGroups)
     {
-        DetachAllChildren();
-        int groupsPerFrame = Mathf.Max(1, Mathf.Min(10, subGroups.Count / 50));
-        var replacementMaps = new List<Dictionary<Block, Block>>(subGroups.Count);
+        // First group stays in current parent
+        var firstGroup = subGroups[0];
+        subGroups.RemoveAt(0);
 
-        for (int i = 0; i < subGroups.Count; i++)
+        // Create new parents for other groups
+        foreach (var group in subGroups)
         {
-            var blockMap = CreateOptimizedGroup(subGroups[i]);
-            replacementMaps.Add(blockMap);
-            if (i % groupsPerFrame == 0) yield return null;
+            CreateNewParentForGroup(group);
+            yield return null;
         }
-        DestroyImmediate(gameObject);
     }
 
-    private void DetachAllChildren()
+    private void CreateNewParentForGroup(HashSet<Block> group)
     {
-        int childCount = _cachedTransform.childCount;
-        if (childCount == 0) return;
+        if (group.Count == 0) return;
 
-        List<Transform> children = new List<Transform>(childCount);
-        for (int i = 0; i < childCount; i++)
-            children.Add(_cachedTransform.GetChild(i));
+        Bounds groupBounds = CalculateGroupBounds(group);
+        var newParentObj = Instantiate(groupSettings.groupPrefab, groupBounds.center, Quaternion.identity);
+        var newParentSystem = newParentObj.GetComponent<ParentBlockScr>();
 
-        foreach (var child in children)
-            child.SetParent(null, true);
+        // Transfer physics state
+        var newRb = newParentObj.GetComponent<Rigidbody>();
+        newRb.velocity = _cachedRigidbody.velocity;
+        newRb.angularVelocity = _cachedRigidbody.angularVelocity;
+        newRb.drag = _cachedRigidbody.drag;
+        newRb.angularDrag = _cachedRigidbody.angularDrag;
+
+        // Move blocks to new parent
+        foreach (var block in group)
+        {
+            managedBlocks.Remove(block);
+            block.parentConnection = newParentObj;
+            newParentSystem.managedBlocks.Add(block);
+
+            // Reassign to new parent's chunks
+            newParentSystem.AddBlockToChunk(block);
+        }
     }
 
-    private Dictionary<Block, Block> CreateOptimizedGroup(HashSet<Block> subgroup)
-    {
-        var oldToNewMap = new Dictionary<Block, Block>();
-        if (groupSettings == null || groupSettings.groupPrefab == null || subgroup.Count == 0)
-            return oldToNewMap;
-
-        Bounds groupBounds = CalculateSubgroupBounds(subgroup);
-        RigidbodyState originalPhysics = CaptureRigidbodyState();
-        GameObject newGroupObj = CreateGroupContainer(groupBounds, originalPhysics);
-        ParentBlockScr newGroupScr = newGroupObj.GetComponent<ParentBlockScr>();
-
-        MigrateBlocksToNewGroup(subgroup, newGroupObj.transform, newGroupScr, oldToNewMap);
-
-        if (newGroupObj.TryGetComponent(out BlockGroup newBlockGroup))
-            newBlockGroup.UpdateGroupBlocks(newGroupScr.managedBlocks);
-
-        return oldToNewMap;
-    }
-
-    private Bounds CalculateSubgroupBounds(HashSet<Block> subgroup)
+    private Bounds CalculateGroupBounds(HashSet<Block> blocks)
     {
         Bounds bounds = new Bounds();
         bool hasBounds = false;
 
-        foreach (var block in subgroup)
+        foreach (var block in blocks)
         {
-            if (block == null) continue;
-
             if (!hasBounds)
             {
                 bounds = new Bounds(block.transform.position, Vector3.zero);
@@ -216,256 +196,106 @@ public class ParentBlockScr : MonoBehaviour
         return bounds;
     }
 
-    private RigidbodyState CaptureRigidbodyState() => new RigidbodyState
+    public void SplitChunk(Chunk sourceChunk, List<HashSet<Block>> subGroups)
     {
-        velocity = _cachedRigidbody.velocity,
-        angularVelocity = _cachedRigidbody.angularVelocity,
-        drag = _cachedRigidbody.drag,
-        angularDrag = _cachedRigidbody.angularDrag
-    };
-
-    private GameObject CreateGroupContainer(Bounds bounds, RigidbodyState physicsState)
-    {
-        GameObject newObj = Instantiate(
-            groupSettings.groupPrefab,
-            bounds.center,
-            _cachedTransform.rotation
-        );
-
-        newObj.name = $"BlockGroup_{bounds.size.magnitude:F1}units";
-        Rigidbody newRb = newObj.GetComponent<Rigidbody>() ?? newObj.AddComponent<Rigidbody>();
-
-        newRb.velocity = physicsState.velocity;
-        newRb.angularVelocity = physicsState.angularVelocity;
-        newRb.drag = physicsState.drag;
-        newRb.angularDrag = physicsState.angularDrag;
-
-        return newObj;
+        StartCoroutine(SplitChunkCoroutine(sourceChunk, subGroups));
     }
 
-    private void MigrateBlocksToNewGroup(
-        HashSet<Block> subgroup,
-        Transform newParent,
-        ParentBlockScr newGroupScr,
-        Dictionary<Block, Block> blockMap)
+    private IEnumerator SplitChunkCoroutine(Chunk sourceChunk, List<HashSet<Block>> subGroups)
     {
-        foreach (var oldBlock in subgroup)
+        // First group stays in original chunk
+        var firstGroup = subGroups[0];
+        sourceChunk.blocks = new HashSet<Block>(firstGroup);
+
+        // Create new chunks for other groups
+        for (int i = 1; i < subGroups.Count; i++)
         {
-            if (oldBlock == null) continue;
+            var newChunk = CreateNewChunk();
+            newChunk.blocks = new HashSet<Block>(subGroups[i]);
 
-            oldBlock.transform.SetParent(newParent, true);
-            oldBlock.parentConnection = newParent.gameObject;
-            oldBlock.Connections.ConnectedObjects.RemoveWhere(go => go == null);
-            newGroupScr.managedBlocks.Add(oldBlock);
-            blockMap.Add(oldBlock, oldBlock);
-            CheckAdvancedBlock(oldBlock, newGroupScr);
-            managedBlocks.Remove(oldBlock);
-        }
-    }
-
-    private void CheckAdvancedBlock(Block block, ParentBlockScr newGroupScr)
-    {
-        var newGroupObj = newGroupScr.gameObject;
-        var newGroupRb = newGroupObj.GetComponent<Rigidbody>();
-
-        if (block.Connections.Bearings.Count > 0)
-        {
-            foreach (var b in block.Connections.Bearings)
+            foreach (var block in subGroups[i])
             {
-                if (block == b.EndConnection)
-                {
-                    b.joint.connectedBody = newGroupRb;
-                    b.joint = b.DuplicateJoint(b.StartConnection.parentConnection, b.StartConnection, b.EndConnection);
-                }
-                else if (block == b.StartConnection)
-                {
-                    b.joint = b.DuplicateJoint(newGroupObj, b.StartConnection, b.EndConnection);
-                }
+                block.chunk = newChunk;
+                block.transform.SetParent(newChunk.transform, true);
             }
-        }
-        if (block.Connections.Dampers.Count > 0)
-        {
-            foreach (var d in block.Connections.Dampers)
-            {
-                if (block == d.EndConnection)
-                {
-                    d.configurableJoint.connectedBody = newGroupRb;
-                    d.configurableJoint = d.CopyJointParameters(d.StartConnection.parentConnection.transform);
-                }
-                else if (block == d.StartConnection)
-                {
-                    d.configurableJoint = d.CopyJointParameters(newGroupObj.transform);
-                }
-            }
+
+            yield return null;
         }
     }
 
-    private struct RigidbodyState
-    {
-        public Vector3 velocity;
-        public Vector3 angularVelocity;
-        public float drag;
-        public float angularDrag;
-    }
-    private List<HashSet<Block>> FindSubGroupsWithJobs()
+    private List<HashSet<Block>> FindSubGroups()
     {
         var blocksList = managedBlocks.ToList();
         int n = blocksList.Count;
         if (n == 0) return new List<HashSet<Block>>();
 
-        // Створюємо NativeArrays без using блоку
-        var blockIDs = new NativeArray<int>(n, Allocator.TempJob);
-        var labels = new NativeArray<int>(n, Allocator.TempJob);
-        var connectionsMap = new NativeParallelMultiHashMap<int, int>(n * 5, Allocator.TempJob);
+        var blockToIndex = new Dictionary<Block, int>(n);
+        var indexToBlock = new Block[n];
 
-        try
+        for (int i = 0; i < n; i++)
         {
-            // Заповнення даних
-            for (int i = 0; i < n; i++)
-            {
-                Block block = blocksList[i];
-                blockIDs[i] = block.gameObject.GetInstanceID();
-                labels[i] = i; // Початкова мітка - індекс
+            Block block = blocksList[i];
+            blockToIndex[block] = i;
+            indexToBlock[i] = block;
+        }
 
-                foreach (var connObj in block.Connections.ConnectedObjects)
+        int[] parent = new int[n];
+        int[] rank = new int[n];
+        for (int i = 0; i < n; i++)
+        {
+            parent[i] = i;
+            rank[i] = 0;
+        }
+
+        int Find(int x)
+        {
+            if (parent[x] != x)
+                parent[x] = Find(parent[x]);
+            return parent[x];
+        }
+
+        for (int i = 0; i < n; i++)
+        {
+            Block block = blocksList[i];
+            foreach (var connObj in block.Connections.ConnectedObjects)
+            {
+                if (connObj != null &&
+                    connObj.TryGetComponent(out Block neighbor) &&
+                    blockToIndex.TryGetValue(neighbor, out int j))
                 {
-                    if (connObj != null &&
-                        connObj.TryGetComponent(out Block neighbor))
+                    int rootI = Find(i);
+                    int rootJ = Find(j);
+                    if (rootI == rootJ) continue;
+
+                    if (rank[rootI] < rank[rootJ])
                     {
-                        connectionsMap.Add(block.gameObject.GetInstanceID(), neighbor.gameObject.GetInstanceID());
+                        parent[rootI] = rootJ;
+                    }
+                    else if (rank[rootI] > rank[rootJ])
+                    {
+                        parent[rootJ] = rootI;
+                    }
+                    else
+                    {
+                        parent[rootJ] = rootI;
+                        rank[rootI]++;
                     }
                 }
             }
-
-            // Створення та запуск Job
-            var job = new FindConnectionsJob
-            {
-                BlockInstanceIDs = blockIDs,
-                ConnectionsMap = connectionsMap,
-                ComponentLabels = labels
-            };
-
-            JobHandle handle = job.Schedule();
-            handle.Complete();
-
-            // Групування результатів
-            var groups = new Dictionary<int, HashSet<Block>>();
-            for (int i = 0; i < n; i++)
-            {
-                int label = labels[i];
-                if (!groups.TryGetValue(label, out var group))
-                {
-                    group = new HashSet<Block>();
-                    groups[label] = group;
-                }
-                group.Add(blocksList[i]);
-            }
-
-            return groups.Values.ToList();
         }
-        finally
+
+        var groups = new Dictionary<int, HashSet<Block>>();
+        for (int i = 0; i < n; i++)
         {
-            // Звільнення ресурсів у finally блоку
-            blockIDs.Dispose();
-            labels.Dispose();
-            connectionsMap.Dispose();
-        }
-    }
-
-    //OLD>>>-------------------------------------------------------------------------
-    private List<HashSet<Block>> FindSubGroups() =>
-        managedBlocks.Count < 100 ? FindSubGroupsSimple() : FindSubGroupsOptimized();
-
-    private List<HashSet<Block>> FindSubGroupsOptimized()
-    {
-        var uf = new DisjointSet(managedBlocks);
-        var blocksList = managedBlocks.ToList();
-        int count = blocksList.Count;
-
-        for (int i = 0; i < count; i++)
-        {
-            var block = blocksList[i];
-            if (block == null) continue;
-
-            var connectedObjects = new List<GameObject>(block.Connections.ConnectedObjects);
-            int connCount = connectedObjects.Count;
-
-            for (int j = 0; j < connCount; j++)
+            int root = Find(i);
+            if (!groups.TryGetValue(root, out var group))
             {
-                var connectedObj = connectedObjects[j];
-                if (connectedObj == null) continue;
-
-                if (connectedObj.TryGetComponent(out Block neighbor) &&
-                    managedBlocks.Contains(neighbor))
-                    uf.Union(block, neighbor);
+                group = new HashSet<Block>();
+                groups[root] = group;
             }
+            group.Add(indexToBlock[i]);
         }
-        return uf.GetSets();
-    }
 
-    private List<HashSet<Block>> FindSubGroupsSimple()
-    {
-        var visited = new HashSet<Block>();
-        var groups = new List<HashSet<Block>>();
-
-        foreach (var block in managedBlocks)
-        {
-            if (block == null || visited.Contains(block)) continue;
-
-            var group = new HashSet<Block>();
-            var stack = new Stack<Block>();
-            stack.Push(block);
-
-            while (stack.Count > 0)
-            {
-                var current = stack.Pop();
-                if (visited.Contains(current)) continue;
-
-                visited.Add(current);
-                group.Add(current);
-
-                var connectedObjects = new List<GameObject>(current.Connections.ConnectedObjects);
-                int count = connectedObjects.Count;
-
-                for (int i = 0; i < count; i++)
-                {
-                    var connectedObj = connectedObjects[i];
-                    if (connectedObj != null &&
-                        connectedObj.TryGetComponent(out Block neighbor) &&
-                        !visited.Contains(neighbor) &&
-                        managedBlocks.Contains(neighbor))
-                    {
-                        stack.Push(neighbor);
-                    }
-                }
-            }
-            groups.Add(group);
-        }
-        return groups;
-    }
-
-    //OLD<<<-------------------------------------------------------------------------
-    private void OnDrawGizmosSelected()
-    {
-        if (managedBlocks == null || managedBlocks.Count == 0)
-            return;
-
-        Gizmos.color = Color.yellow;
-        foreach (var block in managedBlocks)
-        {
-            if (block == null) continue;
-            Vector3 from = block.transform.position;
-            foreach (var go in block.Connections.ConnectedObjects)
-            {
-                if (go == null) continue;
-                if (go.TryGetComponent<Block>(out var neighbor) && managedBlocks.Contains(neighbor))
-                {
-                    Vector3 to = neighbor.transform.position;
-                    Gizmos.DrawLine(from, to);
-                    Gizmos.DrawSphere(from, 0.02f);
-                    Gizmos.DrawSphere(to, 0.02f);
-                }
-            }
-        }
+        return groups.Values.ToList();
     }
 }
