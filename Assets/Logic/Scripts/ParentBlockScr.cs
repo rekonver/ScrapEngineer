@@ -270,11 +270,13 @@ public class ParentBlockScr : MonoBehaviour
             foreach (var b in block.bearings)
             {
                 if (block == b.EndConnection)
+                {
                     b.joint.connectedBody = newGroupRb;
+                    b.joint = b.DuplicateJoint(b.StartConnection.parentConnection, b.StartConnection, b.EndConnection);
+                }
                 else if (block == b.StartConnection)
                 {
-                    var duplicated = b.DuplicateJoint(newGroupObj, b.StartConnection, b.EndConnection);
-                    if (duplicated != null) b.joint = duplicated;
+                    b.joint = b.DuplicateJoint(newGroupObj, b.StartConnection, b.EndConnection);
                 }
             }
         }
@@ -283,9 +285,14 @@ public class ParentBlockScr : MonoBehaviour
             foreach (var d in block.dampers)
             {
                 if (block == d.EndConnection)
+                {
                     d.configurableJoint.connectedBody = newGroupRb;
+                    d.configurableJoint = d.CopyJointParameters(d.StartConnection.parentConnection.transform);
+                }
                 else if (block == d.StartConnection)
+                {
                     d.configurableJoint = d.CopyJointParameters(newGroupObj.transform);
+                }
             }
         }
     }

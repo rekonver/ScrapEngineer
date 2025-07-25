@@ -87,6 +87,7 @@ public class Bearing : MonoBehaviour
         newJoint.useMotor = joint.useMotor;
         newJoint.motor = joint.motor;
 
+        Destroy(joint);
         return newJoint;
     }
 
