@@ -69,11 +69,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: db88dab239c9f6a478fb8c7a83c71967, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  bearings: []
-  dampers: []
+  Connections:
+    Bearings: []
+    Dampers: []
   connectionPoints:
   - {fileID: 934575729596479844}
-  parentConnection: {fileID: 0}
+  ParentConnection: {fileID: 7970412705748065106, guid: cabd9a6bb93f81945bc2fda76627292c, type: 3}
+  Chunk: {fileID: 0}
   checkRadius: 0.5
   blockLayer:
     serializedVersion: 2
@@ -92,8 +94,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   blockInfo: {fileID: 7531485357340066112}
-  StartConnection: {fileID: 0}
-  EndConnection: {fileID: 0}
+  startConnection: {fileID: 0}
+  endConnection: {fileID: 0}
   joint: {fileID: 0}
   customRotation: {x: 0.70710677, y: 0, z: 0, w: 0.70710677}
 --- !u!1 &7246920755833577394

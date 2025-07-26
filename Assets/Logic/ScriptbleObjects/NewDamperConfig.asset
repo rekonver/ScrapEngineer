@@ -12,19 +12,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a9c19ea2982f58948aecaf9f2d044024, type: 3}
   m_Name: NewDamperConfig
   m_EditorClassIdentifier: 
-  endBlockPrefab: {fileID: 2571886995178201441, guid: 67e147c606e0cc8499749b5c179bce57, type: 3}
-  defaultLength: 3
-  springForce: 100
-  damper: 5
-  minDistanceMultiplier: 0.9
-  maxDistanceMultiplier: 1.1
-  tolerance: 0.1
-  damperMaterial: {fileID: 2100000, guid: c2fdd4ddad492c140a4b3cf5583df9bd, type: 2}
-  cylinderDiameter: 0.2
-  projectionMode: 1
-  projectionDistance: 0
-  projectionAngle: 0
-  configuredInWorldSpace: 0
-  swapBodies: 0
-  breakForce: Infinity
-  breakTorque: Infinity
+  EndBlockPrefab: {fileID: 2571886995178201441, guid: 67e147c606e0cc8499749b5c179bce57, type: 3}
+  DefaultLength: 3
+  SpringForce: 100
+  Damper: 5
+  MinDistanceMultiplier: 0.1
+  MaxDistanceMultiplier: 1
+  Tolerance: 0.1
+  DamperMaterial: {fileID: 0}
+  CylinderDiameter: 0.2
+  ProjectionMode: 1
+  ProjectionDistance: 0
+  ProjectionAngle: 0
+  ConfiguredInWorldSpace: 0
+  SwapBodies: 0
+  BreakForce: Infinity
+  BreakTorque: Infinity

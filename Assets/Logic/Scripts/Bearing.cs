@@ -3,23 +3,23 @@ using UnityEngine.UIElements.Experimental;
 
 public class Bearing : MonoBehaviour
 {
-    [SerializeField] Block blockInfo;
-    public Block StartConnection;
-    public Block EndConnection;
-    public HingeJoint joint;
+    [SerializeField] private Block blockInfo;
+    [SerializeField] private Block startConnection;
+    [SerializeField] private Block endConnection;
+    [SerializeField] private HingeJoint joint;
     public Quaternion customRotation = Quaternion.identity;
     private GameObject parentBlock;
 
     public void AddStartPoint(Block block)
     {
-        StartConnection = block;
+        startConnection = block;
         CallBlockToAddBearing(block);
-        parentBlock = block.parentConnection;
+        parentBlock = block.ParentConnection;
     }
 
     public void AddEndPoint(Block block)
     {
-        EndConnection = block;
+        endConnection = block;
         CallBlockToAddBearing(block);
         CreateHingleJoint(parentBlock, block);
         GetComponent<Collider>().enabled = false;
@@ -36,7 +36,7 @@ public class Bearing : MonoBehaviour
 
     private void SetStartSettingsBearing(HingeJoint bearingJoint, Block endBlock, GameObject parentGroup)
     {
-        var endParentGroup = endBlock.parentConnection;
+        var endParentGroup = endBlock.ParentConnection;
         var endParentRb = endParentGroup.GetComponent<Rigidbody>();
 
         if (endParentRb == null)
@@ -49,7 +49,7 @@ public class Bearing : MonoBehaviour
         bearingJoint.autoConfigureConnectedAnchor = false;
 
         SetJointAnchors(bearingJoint, endBlock.transform.position, parentGroup.transform, endParentRb.transform);
-        SetRotationAxis(bearingJoint, StartConnection.transform, EndConnection.transform, parentGroup.transform);
+        SetRotationAxis(bearingJoint, startConnection.transform, endConnection.transform, parentGroup.transform);
         joint = bearingJoint;
     }
 
@@ -78,7 +78,7 @@ public class Bearing : MonoBehaviour
         newJoint.connectedBody = joint.connectedBody;
         newJoint.autoConfigureConnectedAnchor = false;
 
-        SetJointAnchors(newJoint, endBlock.transform.position, newParentGroup.transform, endBlock.parentConnection.transform);
+        SetJointAnchors(newJoint, endBlock.transform.position, newParentGroup.transform, endBlock.ParentConnection.transform);
         SetRotationAxis(newJoint, startBlock.transform, endBlock.transform, newParentGroup.transform);
 
         newJoint.useLimits = joint.useLimits;
@@ -94,11 +94,11 @@ public class Bearing : MonoBehaviour
 
     public void DestroyBearing()
     {
-        if (StartConnection != null)
-            StartConnection.Connections.Bearings.Remove(this);
+        if (startConnection != null)
+            startConnection.Connections.Bearings.Remove(this);
 
-        if (EndConnection != null)
-            EndConnection.Connections.Bearings.Remove(this);
+        if (endConnection != null)
+            endConnection.Connections.Bearings.Remove(this);
 
         if (joint != null) Destroy(joint);
         Destroy(gameObject);

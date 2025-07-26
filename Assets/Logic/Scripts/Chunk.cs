@@ -3,12 +3,12 @@ using System.Collections.Generic;
 
 public class Chunk : MonoBehaviour
 {
-    public const int CHUNK_CAPACITY = 100;
+    public const int ChunkCapacity = 100;
 
     public HashSet<Block> blocks = new HashSet<Block>();
     public ParentBlockScr parentSystem;
 
-    public bool IsFull => blocks.Count >= CHUNK_CAPACITY;
+    public bool IsFull => blocks.Count >= ChunkCapacity;
     public bool IsEmpty => blocks.Count == 0;
 
     public void AddBlock(Block block)
@@ -16,14 +16,14 @@ public class Chunk : MonoBehaviour
         if (IsFull) return;
 
         blocks.Add(block);
-        block.chunk = this;
+        block.Chunk = this;
         block.transform.SetParent(transform, true);
     }
 
     public void RemoveBlock(Block block)
     {
         blocks.Remove(block);
-        block.chunk = null;
+        block.Chunk = null;
         Debug.Log(gameObject.name + $" {blocks.Count}");
 
         if (IsEmpty)
@@ -58,7 +58,7 @@ public class Chunk : MonoBehaviour
                 {
                     if (connObj != null &&
                         connObj.TryGetComponent(out Block neighbor) &&
-                        neighbor.chunk == this &&
+                        neighbor.Chunk == this &&
                         !visited.Contains(neighbor))
                     {
                         stack.Push(neighbor);

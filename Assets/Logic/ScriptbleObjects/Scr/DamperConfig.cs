@@ -4,29 +4,29 @@ using UnityEngine;
 public class DamperConfig : ScriptableObject
 {
     [Header("Block Prefabs")]
-    public GameObject endBlockPrefab;
+    public GameObject EndBlockPrefab;
 
     [Header("Damper Settings")]
     [Tooltip("Default length of the damper")]
-    public float defaultLength = 3f;
+    public float DefaultLength = 3f;
 
     [Header("Spring Joint Settings")]
-    public float springForce = 100f;
-    public float damper = 5f;
-    public float minDistanceMultiplier = 0.1f;
-    public float maxDistanceMultiplier = 1f;
-    public float tolerance = 0.1f;
+    public float SpringForce = 100f;
+    public float Damper = 5f;
+    public float MinDistanceMultiplier = 0.1f;
+    public float MaxDistanceMultiplier = 1f;
+    public float Tolerance = 0.1f;
 
     [Header("Visual Settings")]
-    public Material damperMaterial;
-    public float cylinderDiameter = 0.2f;
+    public Material DamperMaterial;
+    public float CylinderDiameter = 0.2f;
 
     [Header("Stability Settings")]
-    public JointProjectionMode projectionMode = JointProjectionMode.PositionAndRotation;
-    public float projectionDistance = 0f;
-    public float projectionAngle = 0f;
-    public bool configuredInWorldSpace = false;
-    public bool swapBodies = false;
-    public float breakForce = Mathf.Infinity;
-    public float breakTorque = Mathf.Infinity;
+    public JointProjectionMode ProjectionMode = JointProjectionMode.PositionAndRotation;
+    public float ProjectionDistance = 0f;
+    public float ProjectionAngle = 0f;
+    public bool ConfiguredInWorldSpace = false;
+    public bool SwapBodies = false;
+    public float BreakForce = Mathf.Infinity;
+    public float BreakTorque = Mathf.Infinity;
 }

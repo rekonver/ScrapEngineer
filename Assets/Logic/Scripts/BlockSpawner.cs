@@ -3,18 +3,17 @@
 public class BlockSpawner : MonoBehaviour
 {
     [Header("References")]
-    public Camera raycastCamera;
-    public GameObject ParentPrefab;
+    [SerializeField] private Camera raycastCamera;
+    [SerializeField] private GroupSettings groupSettings;
 
     [Header("Block Settings")]
-    public BlockSpawnConfig blockConfig;
+    [SerializeField] private BlockSpawnConfig blockConfig;
 
     [Header("Bearing Settings")]
-    public BearingSpawnConfig bearingConfig;
-    public GameObject bearingPrefab;
+    [SerializeField] private GameObject bearingPrefab;
 
     [Header("Bearing Settings")]
-    public GameObject damperPrefab;
+    [SerializeField] private GameObject damperPrefab;
 
     private BlockRaycaster raycaster;
     private BlockConnector blockConnector;
@@ -22,7 +21,7 @@ public class BlockSpawner : MonoBehaviour
     void Awake()
     {
         raycaster = new BlockRaycaster(raycastCamera, blockConfig.blockLayer);
-        blockConnector = new BlockConnector(blockConfig);
+        blockConnector = new BlockConnector(blockConfig, groupSettings);
     }
 
     void Update()
@@ -52,20 +51,8 @@ public class BlockSpawner : MonoBehaviour
 public class BlockSpawnConfig
 {
     public GameObject blockPrefab;
-    public GameObject parentPrefab;
     public float spawnOffset = 0.25f;
     public LayerMask blockLayer;
-}
-
-[System.Serializable]
-public class BearingSpawnConfig
-{
-    public GameObject bearingParentPrefab;
-    public float bearingSpawnOffset = 0.1f;
-    public float rotationDamper = 0.05f;
-    public bool allowRotationX = false;
-    public bool allowRotationY = true;
-    public bool allowRotationZ = false;
 }
 
 public class BlockRaycaster
@@ -98,14 +85,18 @@ public class BlockRaycaster
 public class BlockConnector
 {
     private readonly BlockSpawnConfig config;
-
-    public BlockConnector(BlockSpawnConfig config) => this.config = config;
+    private readonly GroupSettings groupSettings;
+    public BlockConnector(BlockSpawnConfig config, GroupSettings groupSettings)
+    {
+        this.config = config;
+        this.groupSettings = groupSettings;
+    }
 
     public void SpawnConnectedBlock(GameObject PrefabToSpawn, Block parentBlock, Transform connectionPoint, BlockType blockType = BlockType.Undefined)
     {
         Vector3 spawnPosition = connectionPoint.position + connectionPoint.forward * config.spawnOffset;
         Quaternion spawnRotation = connectionPoint.rotation;
-        Transform parentTransform = parentBlock.parentConnection?.transform;
+        Transform parentTransform = parentBlock.ParentConnection?.transform;
 
         GameObject newBlockObj = Object.Instantiate(
             PrefabToSpawn,
@@ -124,7 +115,7 @@ public class BlockConnector
             {
                 var newParentToBlock = CreateNewParent(parentBlock, spawnPosition);
                 newBlockObj.transform.SetParent(newParentToBlock.transform, worldPositionStays: true);
-                newBlock.parentConnection = newParentToBlock;
+                newBlock.ParentConnection = newParentToBlock;
                 bearing.AddEndPoint(newBlock);
             }
         }
@@ -146,9 +137,9 @@ public class BlockConnector
 
     private GameObject CreateNewParent(Block hitBlock, Vector3 spawnPos)
     {
-        var hitParentTransform = hitBlock.parentConnection.transform;
+        var hitParentTransform = hitBlock.ParentConnection.transform;
         return Object.Instantiate(
-            config.parentPrefab,
+            groupSettings.groupPrefab,
             spawnPos,
             hitParentTransform.rotation
         );
@@ -156,14 +147,14 @@ public class BlockConnector
 
     private void ConnectBlocks(Block parent, Block child)
     {
-        child.parentConnection = parent.parentConnection;
+        child.ParentConnection = parent.ParentConnection;
         parent.Connections.ConnectedObjects.Add(child.gameObject);
         child.Connections.ConnectedObjects.Add(parent.gameObject);
     }
 
     private void ValidateParentConnection(Block block)
     {
-        if (block.parentConnection != null)
-            block.parentConnection.GetComponent<ParentBlockScr>()?.QueueValidation();
+        if (block.ParentConnection != null)
+            block.ParentConnection.GetComponent<ParentBlockScr>()?.QueueValidation();
     }
 }

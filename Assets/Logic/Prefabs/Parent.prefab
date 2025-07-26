@@ -73,7 +73,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 29b958481b496af49896ab50045bedcc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  groupSettings: {fileID: 11400000, guid: c6d26f58a9eac4a4abee7edec6b85812, type: 2}
+  GroupSettings: {fileID: 11400000, guid: c6d26f58a9eac4a4abee7edec6b85812, type: 2}
+  chunks: []
 --- !u!114 &294967418012247145
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -6,11 +6,15 @@ using System.Linq;
 public class ParentBlockScr : MonoBehaviour
 {
     [Header("References")]
-    public GroupSettings groupSettings;
-    public HashSet<Block> managedBlocks = new HashSet<Block>();
-    public List<Chunk> chunks = new List<Chunk>();
+    public GroupSettings GroupSettings;
+
+    public HashSet<Block> ManagedBlocks => managedBlocks;
+
     public bool SuspendValidation { get; set; } = false;
     private bool validationQueued = false;
+
+    private HashSet<Block> managedBlocks = new HashSet<Block>();
+    private List<Chunk> chunks = new List<Chunk>();
 
     private Transform _cachedTransform;
     private Rigidbody _cachedRigidbody;
@@ -26,18 +30,11 @@ public class ParentBlockScr : MonoBehaviour
     {
         if (managedBlocks.Add(block))
         {
-            block.parentConnection = gameObject;
+            block.ParentConnection = gameObject;
             AddBlockToChunk(block);
         }
     }
 
-    //public void UnregisterBlock(Block block)
-    //{
-    //    if (managedBlocks.Remove(block))
-    //    {
-    //        QueueValidation();
-    //    }
-    //}
     public void UnregisterBlock(Block removed)
     {
         if (!managedBlocks.Remove(removed))
@@ -47,7 +44,6 @@ public class ParentBlockScr : MonoBehaviour
 
         if (neighbors.Count == 0)
         {
-            //QueueValidation();
             return;
         }
 
@@ -57,7 +53,6 @@ public class ParentBlockScr : MonoBehaviour
 
         if (subGroups.Count <= 1)
         {
-            //QueueValidation();
             return;
         }
 
@@ -120,7 +115,6 @@ public class ParentBlockScr : MonoBehaviour
             subGroups.Add(unreachable);
     }
 
-    // Швидка версія SplitGroups без корутин
     private void SplitGroupsCoroutineImmediate(List<HashSet<Block>> subGroups)
     {
         var first = subGroups[0];
@@ -137,7 +131,6 @@ public class ParentBlockScr : MonoBehaviour
 
     public void AddBlockToChunk(Block block)
     {
-        // Try to add to existing chunk with space
         foreach (var chunk in chunks)
         {
             if (!chunk.IsFull)
@@ -147,7 +140,6 @@ public class ParentBlockScr : MonoBehaviour
             }
         }
 
-        // Create new chunk if no space
         CreateNewChunk().AddBlock(block);
     }
 
@@ -202,11 +194,9 @@ public class ParentBlockScr : MonoBehaviour
 
     private IEnumerator SplitGroupsCoroutine(List<HashSet<Block>> subGroups)
     {
-        // First group stays in current parent
         var firstGroup = subGroups[0];
         subGroups.RemoveAt(0);
 
-        // Create new parents for other groups
         foreach (var group in subGroups)
         {
             CreateNewParentForGroup(group);
@@ -219,7 +209,7 @@ public class ParentBlockScr : MonoBehaviour
         if (group.Count == 0) return;
 
         Bounds groupBounds = CalculateGroupBounds(group);
-        var newParentObj = Instantiate(groupSettings.groupPrefab, groupBounds.center, Quaternion.identity);
+        var newParentObj = Instantiate(GroupSettings.groupPrefab, groupBounds.center, Quaternion.identity);
         var newParentSystem = newParentObj.GetComponent<ParentBlockScr>();
 
         // Transfer physics state
@@ -233,10 +223,9 @@ public class ParentBlockScr : MonoBehaviour
         foreach (var block in group)
         {
             managedBlocks.Remove(block);
-            block.parentConnection = newParentObj;
+            block.ParentConnection = newParentObj;
             newParentSystem.managedBlocks.Add(block);
 
-            // Reassign to new parent's chunks
             newParentSystem.AddBlockToChunk(block);
         }
     }
