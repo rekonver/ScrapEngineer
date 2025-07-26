@@ -12,36 +12,42 @@ public class Damper : MonoBehaviour
     private GameObject visualRepresentation;
     Transform spawnDirection;
 
+    void Update()
+    {
+        if (visualRepresentation != null)
+            UpdateVisualRepresentation();
+    }
+
     public void Initialize(Block startBlock, Vector3 direction, Transform spawnConnectionPoint)
     {
         StartConnection = startBlock;
-        CurrentLength = config.defaultLength;
+        CurrentLength = config.DefaultLength;
         spawnDirection = spawnConnectionPoint;
 
         CreateEndBlock(direction);
         CreateParentGroup();
         SetupConnections();
-        CreateConfigurableJoint(StartConnection.parentConnection, EndConnection.parentConnection);
+        CreateConfigurableJoint(StartConnection.ParentConnection, EndConnection.ParentConnection);
         CreateVisualRepresentation();
     }
 
     private void CreateEndBlock(Vector3 direction)
     {
         Vector3 endPosition = StartConnection.transform.position + direction * (CurrentLength + 1) * 0.5f;
-        GameObject endBlockObj = Instantiate(config.endBlockPrefab, endPosition, StartConnection.transform.rotation);
+        GameObject endBlockObj = Instantiate(config.EndBlockPrefab, endPosition, StartConnection.transform.rotation);
         EndConnection = endBlockObj.GetComponent<Block>();
     }
 
     private void CreateParentGroup()
     {
-        var startParentScr = StartConnection.parentConnection.GetComponent<ParentBlockScr>();
-        var parentConfig = startParentScr.groupSettings;
+        var startParentScr = StartConnection.ParentConnection.GetComponent<ParentBlockScr>();
+        var parentConfig = startParentScr.GroupSettings;
         GameObject damperParentEnd = Instantiate(parentConfig.groupPrefab,
                                             EndConnection.transform.position,
                                             Quaternion.identity);
         damperParentEnd.name = "DamperParent";
         EndConnection.transform.SetParent(damperParentEnd.transform, true);
-        EndConnection.parentConnection = damperParentEnd;
+        EndConnection.ParentConnection = damperParentEnd;
     }
 
     private void SetupConnections()
@@ -110,18 +116,25 @@ public class Damper : MonoBehaviour
         joint.secondaryAxis = CalculatePerpendicularAxis(localDirection);
     }
 
-    private void SetJointAnchors(ConfigurableJoint joint,
-                            Transform startConnection, Transform endConnection,
-                            Transform parentGroup, Transform endParentGroup,
-                            bool isFirstSpawn = false)
+    private void SetJointAnchors(
+        ConfigurableJoint joint,
+        Transform startPointTransform, Transform endPointTransform,
+        Transform parentBodyTransform, Transform connectedBodyTransform,
+        bool isFirstSpawn = false)
     {
-        Vector3 capsuleWorldPos = startConnection.position;
-        Vector3 directionToTriangle = -spawnDirection.forward;
+        Vector3 worldAnchorPosition = startPointTransform.position;
+        Vector3 inverseDirection = -spawnDirection.forward;
 
-        joint.anchor = parentGroup.InverseTransformPoint(capsuleWorldPos);
-        Vector3 desiredAnchorPos = capsuleWorldPos + directionToTriangle * ((CurrentLength + 1) * 0.5f - Vector3.Distance(capsuleWorldPos, endConnection.position));
-        joint.connectedAnchor = endParentGroup.InverseTransformPoint(desiredAnchorPos);
+        joint.anchor = parentBodyTransform.InverseTransformPoint(worldAnchorPosition);
+
+        float halfTotalLength = (CurrentLength + 1f) * 0.5f;
+        float currentDistance = Vector3.Distance(worldAnchorPosition, endPointTransform.position);
+        Vector3 adjustedWorldConnectedAnchor = worldAnchorPosition
+            + inverseDirection * (halfTotalLength - currentDistance);
+
+        joint.connectedAnchor = connectedBodyTransform.InverseTransformPoint(adjustedWorldConnectedAnchor);
     }
+
 
     private void ConfigureJointMotions(ConfigurableJoint joint)
     {
@@ -145,7 +158,7 @@ public class Damper : MonoBehaviour
     {
         SoftJointLimit limit = new SoftJointLimit
         {
-            limit = CurrentLength * config.maxDistanceMultiplier,
+            limit = CurrentLength * config.MaxDistanceMultiplier,
             bounciness = 0.1f,
             contactDistance = 0.01f
         };
@@ -153,8 +166,8 @@ public class Damper : MonoBehaviour
 
         SoftJointLimitSpring limitSpring = new SoftJointLimitSpring
         {
-            spring = config.springForce,
-            damper = config.damper
+            spring = config.SpringForce,
+            damper = config.Damper
         };
         configurableJoint.linearLimitSpring = limitSpring;
     }
@@ -163,32 +176,32 @@ public class Damper : MonoBehaviour
     {
         JointDrive drive = new JointDrive
         {
-            positionSpring = config.springForce,
-            positionDamper = config.damper,
-            maximumForce = config.springForce * 2f
+            positionSpring = config.SpringForce,
+            positionDamper = config.Damper,
+            maximumForce = config.SpringForce * 2f
         };
         configurableJoint.xDrive = drive;
     }
 
     private void SetupJointStability()
     {
-        configurableJoint.projectionMode = config.projectionMode;
-        configurableJoint.projectionDistance = config.projectionDistance;
-        configurableJoint.projectionAngle = config.projectionAngle;
-        configurableJoint.configuredInWorldSpace = config.configuredInWorldSpace;
-        configurableJoint.swapBodies = config.swapBodies;
-        configurableJoint.breakForce = config.breakForce;
-        configurableJoint.breakTorque = config.breakTorque;
+        configurableJoint.projectionMode = config.ProjectionMode;
+        configurableJoint.projectionDistance = config.ProjectionDistance;
+        configurableJoint.projectionAngle = config.ProjectionAngle;
+        configurableJoint.configuredInWorldSpace = config.ConfiguredInWorldSpace;
+        configurableJoint.swapBodies = config.SwapBodies;
+        configurableJoint.breakForce = config.BreakForce;
+        configurableJoint.breakTorque = config.BreakTorque;
     }
 
     private void CreateVisualRepresentation()
     {
         visualRepresentation = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        visualRepresentation.transform.SetParent(EndConnection.parentConnection.transform);
+        visualRepresentation.transform.SetParent(EndConnection.ParentConnection.transform);
         Destroy(visualRepresentation.GetComponent<Collider>());
 
-        if (config.damperMaterial != null)
-            visualRepresentation.GetComponent<Renderer>().material = config.damperMaterial;
+        if (config.DamperMaterial != null)
+            visualRepresentation.GetComponent<Renderer>().material = config.DamperMaterial;
 
         UpdateVisualRepresentation();
     }
@@ -205,16 +218,10 @@ public class Damper : MonoBehaviour
 
         float distance = Vector3.Distance(startPos, endPos);
         visualRepresentation.transform.localScale = new Vector3(
-            config.cylinderDiameter,
+            config.CylinderDiameter,
             distance / 2f,
-            config.cylinderDiameter
+            config.CylinderDiameter
         );
-    }
-
-    void Update()
-    {
-        if (visualRepresentation != null)
-            UpdateVisualRepresentation();
     }
 
     public void DestroyDamper()

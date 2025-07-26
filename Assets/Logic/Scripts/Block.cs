@@ -12,25 +12,24 @@ public class BlockConnections
 
 public class Block : MonoBehaviour
 {
-    [Header("Connections")]
-    public BlockConnections Connections = new BlockConnections();
+    [HideInInspector] public BlockConnections Connections = new BlockConnections();
 
     [Header("Connections")]
-    public List<Transform> connectionPoints;
-    public GameObject parentConnection;
-    public Chunk chunk;
+    public GameObject ParentConnection;
+    public Chunk Chunk;
+
+    public Transform CachedTransform => _cachedTransform != null ? _cachedTransform : (_cachedTransform = transform);
+    public GameObject CachedGameObject => _cachedGameObject != null ? _cachedGameObject : (_cachedGameObject = gameObject);
 
     [Header("Auto-Connect Settings")]
-    public float checkRadius = 0.5f;
-    public LayerMask blockLayer;
-    public bool canBeDeleted = true;
+    [SerializeField] private float checkRadius = 0.5f;
+    [SerializeField] private LayerMask blockLayer;
+    [SerializeField] private bool canBeDeleted = true;
+    [SerializeField] private List<Transform> connectionPoints;
 
     private Transform _cachedTransform;
     private GameObject _cachedGameObject;
     private Collider[] _overlapBuffer = new Collider[64];
-
-    public Transform CachedTransform => _cachedTransform != null ? _cachedTransform : (_cachedTransform = transform);
-    public GameObject CachedGameObject => _cachedGameObject != null ? _cachedGameObject : (_cachedGameObject = gameObject);
 
     private void Awake() => CacheReferences();
     private void CacheReferences()
@@ -41,9 +40,9 @@ public class Block : MonoBehaviour
 
     private void Start()
     {
-        if (parentConnection != null)
+        if (ParentConnection != null)
         {
-            var parentSystem = parentConnection.GetComponent<ParentBlockScr>();
+            var parentSystem = ParentConnection.GetComponent<ParentBlockScr>();
             parentSystem?.RegisterBlock(this);
         }
         CheckConnections();
@@ -69,7 +68,7 @@ public class Block : MonoBehaviour
                 if (col.gameObject == CachedGameObject) continue;
 
                 if (!col.TryGetComponent(out Block otherBlock) ||
-                    otherBlock.parentConnection != parentConnection)
+                    otherBlock.ParentConnection != ParentConnection)
                     continue;
 
                 Connections.ConnectedObjects.Add(otherBlock.CachedGameObject);
@@ -99,21 +98,21 @@ public class Block : MonoBehaviour
             if (obj.TryGetComponent(out Block b))
             {
                 b.Connections.ConnectedObjects.Remove(CachedGameObject);
-                if (b.parentConnection != null)
-                    b.parentConnection.GetComponent<ParentBlockScr>()?.QueueValidation();
+                if (b.ParentConnection != null)
+                    b.ParentConnection.GetComponent<ParentBlockScr>()?.QueueValidation();
             }
         }
 
-        if (parentConnection != null)
+        if (ParentConnection != null)
         {
-            parentConnection.GetComponent<ParentBlockScr>()?.UnregisterBlock(this);
-            if (parentConnection.TryGetComponent(out Block parentBlock))
+            ParentConnection.GetComponent<ParentBlockScr>()?.UnregisterBlock(this);
+            if (ParentConnection.TryGetComponent(out Block parentBlock))
                 parentBlock.Connections.ConnectedObjects.Remove(CachedGameObject);
         }
 
-        if (chunk != null)
+        if (Chunk != null)
         {
-            chunk.RemoveBlock(this);
+            Chunk.RemoveBlock(this);
         }
 
         Destroy(CachedGameObject);

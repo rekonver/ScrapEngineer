@@ -56,8 +56,8 @@ public class GridBlockSpawner : MonoBehaviour
 
                     if (blockObj.TryGetComponent(out Block block))
                     {
-                        block.parentConnection = parentObj;
-                        parentSystem.managedBlocks.Add(block);
+                        block.ParentConnection = parentObj;
+                        parentSystem.ManagedBlocks.Add(block);
                         parentSystem.AddBlockToChunk(block);
                     }
 
@@ -78,10 +78,10 @@ public class GridBlockSpawner : MonoBehaviour
         yield return new WaitForFixedUpdate();
         yield return new WaitForEndOfFrame();
 
-        int blocksPerFrame = Mathf.Max(50, parentSystem.managedBlocks.Count / 50);
+        int blocksPerFrame = Mathf.Max(50, parentSystem.ManagedBlocks.Count / 50);
         int processed = 0;
 
-        foreach (var block in parentSystem.managedBlocks)
+        foreach (var block in parentSystem.ManagedBlocks)
         {
             block.CheckConnections();
             processed++;
