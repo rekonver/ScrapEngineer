@@ -20,18 +20,6 @@ public class ParentBlockScr : MonoBehaviour
         _cachedTransform = transform;
         _cachedRigidbody = GetComponent<Rigidbody>();
         _cachedRigidbody.isKinematic = false;
-        RegisterChildBlocks();
-    }
-
-    private void RegisterChildBlocks()
-    {
-        foreach (Transform child in _cachedTransform)
-        {
-            if (child.TryGetComponent(out Block block) && block.parentConnection == gameObject)
-            {
-                RegisterBlock(block);
-            }
-        }
     }
 
     public void RegisterBlock(Block block)
@@ -40,31 +28,112 @@ public class ParentBlockScr : MonoBehaviour
         {
             block.parentConnection = gameObject;
             AddBlockToChunk(block);
-            QueueValidation();
         }
     }
 
-    public void UnregisterBlock(Block block)
+    //public void UnregisterBlock(Block block)
+    //{
+    //    if (managedBlocks.Remove(block))
+    //    {
+    //        QueueValidation();
+    //    }
+    //}
+    public void UnregisterBlock(Block removed)
     {
-        if (managedBlocks.Remove(block))
+        if (!managedBlocks.Remove(removed))
+            return;
+
+        var neighbors = GetRemainingNeighbors(removed);
+
+        if (neighbors.Count == 0)
         {
-            if (block.chunk != null)
+            //QueueValidation();
+            return;
+        }
+
+        var subGroups = CollectSubGroups(neighbors, removed);
+
+        AddUnreachableBlocks(subGroups, removed);
+
+        if (subGroups.Count <= 1)
+        {
+            //QueueValidation();
+            return;
+        }
+
+        SplitGroupsCoroutineImmediate(subGroups);
+    }
+
+    private List<Block> GetRemainingNeighbors(Block removed)
+    {
+        return removed.Connections.ConnectedObjects
+            .Where(o => o != null && o.TryGetComponent<Block>(out var b) && managedBlocks.Contains(b))
+            .Select(o => o.GetComponent<Block>())
+            .Distinct()
+            .ToList();
+    }
+
+    private List<HashSet<Block>> CollectSubGroups(List<Block> neighbors, Block removed)
+    {
+        var visited = new HashSet<Block>();
+        var subGroups = new List<HashSet<Block>>();
+
+        foreach (var start in neighbors)
+        {
+            if (visited.Contains(start))
+                continue;
+
+            var group = new HashSet<Block>();
+            var queue = new Queue<Block>();
+            queue.Enqueue(start);
+            visited.Add(start);
+
+            while (queue.Count > 0)
             {
-                block.chunk.RemoveBlock(block);
+                var curr = queue.Dequeue();
+                group.Add(curr);
+
+                foreach (var obj in curr.Connections.ConnectedObjects)
+                {
+                    if (obj == null || !obj.TryGetComponent<Block>(out var nb) || nb == removed)
+                        continue;
+
+                    if (!managedBlocks.Contains(nb) || visited.Contains(nb))
+                        continue;
+
+                    visited.Add(nb);
+                    queue.Enqueue(nb);
+                }
             }
-            CleanConnections(block);
-            QueueValidation();
+
+            subGroups.Add(group);
+        }
+
+        return subGroups;
+    }
+
+    private void AddUnreachableBlocks(List<HashSet<Block>> subGroups, Block removed)
+    {
+        var allVisited = new HashSet<Block>(subGroups.SelectMany(g => g));
+        var unreachable = managedBlocks.Except(allVisited).ToHashSet();
+        if (unreachable.Count > 0)
+            subGroups.Add(unreachable);
+    }
+
+    // Швидка версія SplitGroups без корутин
+    private void SplitGroupsCoroutineImmediate(List<HashSet<Block>> subGroups)
+    {
+        var first = subGroups[0];
+        subGroups.RemoveAt(0);
+
+        foreach (var group in subGroups)
+        {
+            CreateNewParentForGroup(group);
+            foreach (var b in group)
+                managedBlocks.Remove(b);
         }
     }
 
-    private void CleanConnections(Block removed)
-    {
-        var removedId = removed.CachedGameObject.GetInstanceID();
-        foreach (var b in managedBlocks)
-        {
-            b.Connections.ConnectedObjects.RemoveWhere(go => go != null && go.GetInstanceID() == removedId);
-        }
-    }
 
     public void AddBlockToChunk(Block block)
     {
@@ -86,9 +155,11 @@ public class ParentBlockScr : MonoBehaviour
     {
         GameObject chunkObj = new GameObject($"Chunk_{chunks.Count}");
         chunkObj.transform.SetParent(_cachedTransform);
+
         Chunk chunk = chunkObj.AddComponent<Chunk>();
         chunk.parentSystem = this;
         chunks.Add(chunk);
+
         return chunk;
     }
 
@@ -120,12 +191,6 @@ public class ParentBlockScr : MonoBehaviour
         {
             DestroyImmediate(gameObject);
             return;
-        }
-
-        // First validate each chunk
-        foreach (var chunk in chunks.ToList())
-        {
-            chunk.CheckChunkIntegrity();
         }
 
         // Then validate global connections
@@ -194,33 +259,6 @@ public class ParentBlockScr : MonoBehaviour
             }
         }
         return bounds;
-    }
-
-    public void SplitChunk(Chunk sourceChunk, List<HashSet<Block>> subGroups)
-    {
-        StartCoroutine(SplitChunkCoroutine(sourceChunk, subGroups));
-    }
-
-    private IEnumerator SplitChunkCoroutine(Chunk sourceChunk, List<HashSet<Block>> subGroups)
-    {
-        // First group stays in original chunk
-        var firstGroup = subGroups[0];
-        sourceChunk.blocks = new HashSet<Block>(firstGroup);
-
-        // Create new chunks for other groups
-        for (int i = 1; i < subGroups.Count; i++)
-        {
-            var newChunk = CreateNewChunk();
-            newChunk.blocks = new HashSet<Block>(subGroups[i]);
-
-            foreach (var block in subGroups[i])
-            {
-                block.chunk = newChunk;
-                block.transform.SetParent(newChunk.transform, true);
-            }
-
-            yield return null;
-        }
     }
 
     private List<HashSet<Block>> FindSubGroups()
