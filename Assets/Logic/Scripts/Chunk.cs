@@ -24,22 +24,13 @@ public class Chunk : MonoBehaviour
     {
         blocks.Remove(block);
         block.chunk = null;
+        Debug.Log(gameObject.name + $" {blocks.Count}");
 
         if (IsEmpty)
         {
             parentSystem.RemoveChunk(this);
             Destroy(gameObject);
         }
-    }
-
-    public void CheckChunkIntegrity()
-    {
-        if (blocks.Count < 2) return;
-
-        var subGroups = FindSubGroups();
-        if (subGroups.Count <= 1) return;
-
-        parentSystem.SplitChunk(this, subGroups);
     }
 
     private List<HashSet<Block>> FindSubGroups()
