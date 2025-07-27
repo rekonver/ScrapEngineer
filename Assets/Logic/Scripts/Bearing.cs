@@ -4,22 +4,22 @@ using UnityEngine.UIElements.Experimental;
 public class Bearing : MonoBehaviour
 {
     [SerializeField] private Block blockInfo;
-    [SerializeField] private Block startConnection;
-    [SerializeField] private Block endConnection;
-    [SerializeField] private HingeJoint joint;
+    public Block StartConnection;
+    public Block EndConnection;
+    public HingeJoint Joint;
     public Quaternion customRotation = Quaternion.identity;
     private GameObject parentBlock;
 
     public void AddStartPoint(Block block)
     {
-        startConnection = block;
+        StartConnection = block;
         CallBlockToAddBearing(block);
         parentBlock = block.ParentConnection;
     }
 
     public void AddEndPoint(Block block)
     {
-        endConnection = block;
+        EndConnection = block;
         CallBlockToAddBearing(block);
         CreateHingleJoint(parentBlock, block);
         GetComponent<Collider>().enabled = false;
@@ -49,8 +49,8 @@ public class Bearing : MonoBehaviour
         bearingJoint.autoConfigureConnectedAnchor = false;
 
         SetJointAnchors(bearingJoint, endBlock.transform.position, parentGroup.transform, endParentRb.transform);
-        SetRotationAxis(bearingJoint, startConnection.transform, endConnection.transform, parentGroup.transform);
-        joint = bearingJoint;
+        SetRotationAxis(bearingJoint, StartConnection.transform, EndConnection.transform, parentGroup.transform);
+        Joint = bearingJoint;
     }
 
     private void SetJointAnchors(HingeJoint joint, Vector3 worldAnchorPosition, Transform parentTransform, Transform connectedTransform)
@@ -68,39 +68,45 @@ public class Bearing : MonoBehaviour
 
     public HingeJoint DuplicateJoint(GameObject newParentGroup, Block startBlock, Block endBlock)
     {
-        if (joint == null)
+        if (Joint == null)
         {
             Debug.LogWarning("Немає оригінального joint для копіювання!");
             return null;
         }
 
         var newJoint = newParentGroup.AddComponent<HingeJoint>();
-        newJoint.connectedBody = joint.connectedBody;
+        newJoint.connectedBody = Joint.connectedBody;
         newJoint.autoConfigureConnectedAnchor = false;
 
         SetJointAnchors(newJoint, endBlock.transform.position, newParentGroup.transform, endBlock.ParentConnection.transform);
         SetRotationAxis(newJoint, startBlock.transform, endBlock.transform, newParentGroup.transform);
 
-        newJoint.useLimits = joint.useLimits;
-        newJoint.limits = joint.limits;
-        newJoint.useSpring = joint.useSpring;
-        newJoint.spring = joint.spring;
-        newJoint.useMotor = joint.useMotor;
-        newJoint.motor = joint.motor;
+        newJoint.useLimits = Joint.useLimits;
+        newJoint.limits = Joint.limits;
+        newJoint.useSpring = Joint.useSpring;
+        newJoint.spring = Joint.spring;
+        newJoint.useMotor = Joint.useMotor;
+        newJoint.motor = Joint.motor;
 
-        Destroy(joint);
+        Destroy(Joint);
         return newJoint;
     }
 
     public void DestroyBearing()
     {
-        if (startConnection != null)
-            startConnection.Connections.Bearings.Remove(this);
+        if (StartConnection != null)
+        {
+            StartConnection.Connections.Bearings.Remove(this);
+            StartConnection.DeleteBlock();
+        }
 
-        if (endConnection != null)
-            endConnection.Connections.Bearings.Remove(this);
+        if (EndConnection != null)
+        {
+            EndConnection.Connections.Bearings.Remove(this);
+            EndConnection.DeleteBlock();
+        }
 
-        if (joint != null) Destroy(joint);
+        if (Joint != null) Destroy(Joint);
         Destroy(gameObject);
     }
 }

@@ -98,8 +98,8 @@ public class Block : MonoBehaviour
             if (obj.TryGetComponent(out Block b))
             {
                 b.Connections.ConnectedObjects.Remove(CachedGameObject);
-                if (b.ParentConnection != null)
-                    b.ParentConnection.GetComponent<ParentBlockScr>()?.QueueValidation();
+                //if (b.ParentConnection != null)
+                //    b.ParentConnection.GetComponent<ParentBlockScr>()?.QueueValidation();
             }
         }
 

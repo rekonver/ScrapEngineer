@@ -470,15 +470,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6692192887300876646, guid: e4caaec83a629ad47902e3178e0e89fd, type: 3}
       propertyPath: sizeX
-      value: 12
+      value: 20
       objectReference: {fileID: 0}
     - target: {fileID: 6692192887300876646, guid: e4caaec83a629ad47902e3178e0e89fd, type: 3}
       propertyPath: sizeY
-      value: 12
+      value: 20
       objectReference: {fileID: 0}
     - target: {fileID: 6692192887300876646, guid: e4caaec83a629ad47902e3178e0e89fd, type: 3}
       propertyPath: sizeZ
-      value: 12
+      value: 20
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -668,21 +668,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   raycastCamera: {fileID: 1254069874}
-  ParentPrefab: {fileID: 0}
+  groupSettings: {fileID: 11400000, guid: c6d26f58a9eac4a4abee7edec6b85812, type: 2}
   blockConfig:
     blockPrefab: {fileID: 2571886995178201441, guid: 027dc8e7cdca5424aabf32553a1bc399, type: 3}
-    parentPrefab: {fileID: 7970412705748065106, guid: cabd9a6bb93f81945bc2fda76627292c, type: 3}
     spawnOffset: 0.25
     blockLayer:
       serializedVersion: 2
       m_Bits: 8
-  bearingConfig:
-    bearingParentPrefab: {fileID: 3148411545662802494, guid: 3c7a6cfe20b3b5449b17856c4fb62d2c, type: 3}
-    bearingSpawnOffset: 0.25
-    rotationDamper: 0.05
-    allowRotationX: 0
-    allowRotationY: 0
-    allowRotationZ: 1
   bearingPrefab: {fileID: 2571886995178201441, guid: 43406943d647d3247b08b542b42536f3, type: 3}
   damperPrefab: {fileID: 3148411545662802494, guid: a95af4f7e33abb049b578fe60b03c941, type: 3}
 --- !u!1001 &1703294412
@@ -1160,6 +1152,10 @@ PrefabInstance:
       propertyPath: canBeDeleted
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 7531485357340066112, guid: 027dc8e7cdca5424aabf32553a1bc399, type: 3}
+      propertyPath: ParentConnection
+      value: 
+      objectReference: {fileID: 1557315899}
     - target: {fileID: 7531485357340066112, guid: 027dc8e7cdca5424aabf32553a1bc399, type: 3}
       propertyPath: parentConnection
       value: 

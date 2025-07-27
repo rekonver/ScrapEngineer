@@ -56,6 +56,8 @@ public class ParentBlockScr : MonoBehaviour
             return;
         }
 
+        subGroups.Sort((a, b) => b.Count.CompareTo(a.Count));
+
         SplitGroupsCoroutineImmediate(subGroups);
     }
 
@@ -189,27 +191,15 @@ public class ParentBlockScr : MonoBehaviour
         var subGroups = FindSubGroups();
         if (subGroups.Count <= 1) return;
 
-        StartCoroutine(SplitGroupsCoroutine(subGroups));
-    }
-
-    private IEnumerator SplitGroupsCoroutine(List<HashSet<Block>> subGroups)
-    {
-        var firstGroup = subGroups[0];
-        subGroups.RemoveAt(0);
-
-        foreach (var group in subGroups)
-        {
-            CreateNewParentForGroup(group);
-            yield return null;
-        }
+        SplitGroupsCoroutineImmediate(subGroups);
     }
 
     private void CreateNewParentForGroup(HashSet<Block> group)
     {
         if (group.Count == 0) return;
 
-        Bounds groupBounds = CalculateGroupBounds(group);
-        var newParentObj = Instantiate(GroupSettings.groupPrefab, groupBounds.center, Quaternion.identity);
+        //Bounds groupBounds = CalculateGroupBounds(group);
+        var newParentObj = Instantiate(GroupSettings.groupPrefab, transform.position, transform.rotation);
         var newParentSystem = newParentObj.GetComponent<ParentBlockScr>();
 
         // Transfer physics state
@@ -226,7 +216,46 @@ public class ParentBlockScr : MonoBehaviour
             block.ParentConnection = newParentObj;
             newParentSystem.managedBlocks.Add(block);
 
+            CheckAdvancedBlock(block, newParentSystem);
+
             newParentSystem.AddBlockToChunk(block);
+        }
+    }
+
+    private void CheckAdvancedBlock(Block block, ParentBlockScr newGroupScr)
+    {
+        var newGroupObj = newGroupScr.gameObject;
+        var newGroupRb = newGroupObj.GetComponent<Rigidbody>();
+
+        if (block.Connections.Bearings.Count > 0)
+        {
+            foreach (var b in block.Connections.Bearings)
+            {
+                if (block == b.EndConnection)
+                {
+                    b.Joint.connectedBody = newGroupRb;
+                    b.Joint = b.DuplicateJoint(b.StartConnection.ParentConnection, b.StartConnection, b.EndConnection);
+                }
+                else if (block == b.StartConnection)
+                {
+                    b.Joint = b.DuplicateJoint(newGroupObj, b.StartConnection, b.EndConnection);
+                }
+            }
+        }
+        if (block.Connections.Dampers.Count > 0)
+        {
+            foreach (var d in block.Connections.Dampers)
+            {
+                if (block == d.EndConnection)
+                {
+                    d.configurableJoint.connectedBody = newGroupRb;
+                    d.configurableJoint = d.CopyJointParameters(d.StartConnection.ParentConnection.transform);
+                }
+                else if (block == d.StartConnection)
+                {
+                    d.configurableJoint = d.CopyJointParameters(newGroupObj.transform);
+                }
+            }
         }
     }
 
