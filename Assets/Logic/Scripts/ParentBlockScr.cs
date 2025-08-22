@@ -14,7 +14,6 @@ public class ParentBlockScr : MonoBehaviour
     private bool validationQueued = false;
 
     private HashSet<Block> managedBlocks = new HashSet<Block>();
-    private List<Chunk> chunks = new List<Chunk>();
 
     private Transform _cachedTransform;
     private Rigidbody _cachedRigidbody;
@@ -31,7 +30,7 @@ public class ParentBlockScr : MonoBehaviour
         if (managedBlocks.Add(block))
         {
             block.ParentConnection = gameObject;
-            AddBlockToChunk(block);
+            block.transform.SetParent(_cachedTransform, true);
         }
     }
 
@@ -130,39 +129,6 @@ public class ParentBlockScr : MonoBehaviour
         }
     }
 
-
-    public void AddBlockToChunk(Block block)
-    {
-        foreach (var chunk in chunks)
-        {
-            if (!chunk.IsFull)
-            {
-                chunk.AddBlock(block);
-                return;
-            }
-        }
-
-        CreateNewChunk().AddBlock(block);
-    }
-
-    private Chunk CreateNewChunk()
-    {
-        GameObject chunkObj = new GameObject($"Chunk_{chunks.Count}");
-        chunkObj.transform.SetParent(_cachedTransform);
-
-        Chunk chunk = chunkObj.AddComponent<Chunk>();
-        chunk.parentSystem = this;
-        chunks.Add(chunk);
-
-        return chunk;
-    }
-
-    public void RemoveChunk(Chunk chunk)
-    {
-        chunks.Remove(chunk);
-        Destroy(chunk.gameObject);
-    }
-
     public void QueueValidation()
     {
         if (validationQueued || SuspendValidation) return;
@@ -198,7 +164,6 @@ public class ParentBlockScr : MonoBehaviour
     {
         if (group.Count == 0) return;
 
-        //Bounds groupBounds = CalculateGroupBounds(group);
         var newParentObj = Instantiate(GroupSettings.groupPrefab, transform.position, transform.rotation);
         var newParentSystem = newParentObj.GetComponent<ParentBlockScr>();
 
@@ -210,15 +175,16 @@ public class ParentBlockScr : MonoBehaviour
         newRb.angularDrag = _cachedRigidbody.angularDrag;
 
         // Move blocks to new parent
-        foreach (var block in group)
+        for (int i = group.Count - 1; i >= 0; i--)
         {
+            var block = group.ElementAt(i);
+
             managedBlocks.Remove(block);
             block.ParentConnection = newParentObj;
             newParentSystem.managedBlocks.Add(block);
+            block.transform.SetParent(newParentObj.transform, true);
 
             CheckAdvancedBlock(block, newParentSystem);
-
-            newParentSystem.AddBlockToChunk(block);
         }
     }
 
@@ -257,26 +223,6 @@ public class ParentBlockScr : MonoBehaviour
                 }
             }
         }
-    }
-
-    private Bounds CalculateGroupBounds(HashSet<Block> blocks)
-    {
-        Bounds bounds = new Bounds();
-        bool hasBounds = false;
-
-        foreach (var block in blocks)
-        {
-            if (!hasBounds)
-            {
-                bounds = new Bounds(block.transform.position, Vector3.zero);
-                hasBounds = true;
-            }
-            else
-            {
-                bounds.Encapsulate(block.transform.position);
-            }
-        }
-        return bounds;
     }
 
     private List<HashSet<Block>> FindSubGroups()
