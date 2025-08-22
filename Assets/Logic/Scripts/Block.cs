@@ -16,7 +16,6 @@ public class Block : MonoBehaviour
 
     [Header("Connections")]
     public GameObject ParentConnection;
-    public Chunk Chunk;
 
     public Transform CachedTransform => _cachedTransform != null ? _cachedTransform : (_cachedTransform = transform);
     public GameObject CachedGameObject => _cachedGameObject != null ? _cachedGameObject : (_cachedGameObject = gameObject);
@@ -98,8 +97,6 @@ public class Block : MonoBehaviour
             if (obj.TryGetComponent(out Block b))
             {
                 b.Connections.ConnectedObjects.Remove(CachedGameObject);
-                //if (b.ParentConnection != null)
-                //    b.ParentConnection.GetComponent<ParentBlockScr>()?.QueueValidation();
             }
         }
 
@@ -108,11 +105,6 @@ public class Block : MonoBehaviour
             ParentConnection.GetComponent<ParentBlockScr>()?.UnregisterBlock(this);
             if (ParentConnection.TryGetComponent(out Block parentBlock))
                 parentBlock.Connections.ConnectedObjects.Remove(CachedGameObject);
-        }
-
-        if (Chunk != null)
-        {
-            Chunk.RemoveBlock(this);
         }
 
         Destroy(CachedGameObject);
